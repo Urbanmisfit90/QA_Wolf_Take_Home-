@@ -51,15 +51,27 @@ const { chromium } = require('playwright');
     ...article,
     time: parseRelativeTime(article.timeText)
   }));
+  console.log(articles)
 
-  // Validate the order based on timestamps
-  const firstArticleTime = articles[0].time;
-  const lastArticleTime = articles[99].time;
+  let isOrderedCorrectly = true;
 
-  if (firstArticleTime && lastArticleTime && firstArticleTime > lastArticleTime) {
-    console.log('The articles are correctly ordered from newest to oldest.');
+  for (let i = 0; i < articles.length - 1; i++) {
+    const currentArticleTime = articles[i].time;
+    const nextArticleTime = articles[i + 1].time;
+
+    if (currentArticleTime < nextArticleTime) {
+      console.log(`Ordering errors at articles ${i + 1} and ${i + 2}`);
+      console.log(`"${articles[i].title}" at ${articles[i].timeText}`);
+      console.log(`"${articles[i +1].title}" at ${articles[i + 1].timeText}`);
+      isOrderedCorrectly = false;
+      break;
+    }
+  }
+
+  if (isOrderedCorrectly) {
+    console.log('All 100 articles are correctly ordered from newest to oldest')
   } else {
-    console.log('The articles are not ordered correctly.');
+    console.log('The articles are not ordered from newest to oldest.')
   }
 
   await browser.close();
