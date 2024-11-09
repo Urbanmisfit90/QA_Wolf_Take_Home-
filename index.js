@@ -1,3 +1,5 @@
+require('dotenv').config();  // Load environment variables at the top
+
 const { chromium } = require("playwright");
 const fs = require('fs');
 const path = require('path');
@@ -6,7 +8,7 @@ const nodemailer = require('nodemailer');
 // Convert articles array to CSV format
 const toCSV = (articles) => {
   const rows = articles.map((article, index) => {
-    return `${index + 1},"${article.title}","${article.timeText}","${article.time.toISOString()}"`;
+    return `${index + 1},"${article.title.replace(/"/g, '""')}","${article.timeText}","${article.time.toISOString()}"`;
   });
   return rows.join("\n");
 };
@@ -16,21 +18,22 @@ const saveFile = (csvContent) => {
   const filePath = path.join(__dirname, "articles.csv");
   const header = "#,title,timeText,time\n";
   fs.writeFileSync(filePath, header + csvContent, "utf8");
+  console.log("CSV file saved successfully.");
   return filePath;
 };
 
 // Send an email with the CSV file as an attachment
 const sendEmailWithAttachment = async (filePath, recipientEmail) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // e.g., 'gmail'
+    service: 'gmail',
     auth: {
-      user: 'your-email@gmail.com', // replace with your email
-      pass: 'your-password-or-app-password' // replace with your password or app password
+      user: process.env.EMAIL_USER,  // Use environment variables for security
+      pass: process.env.EMAIL_PASS   // Replace 'EMAIL_USER' and 'EMAIL_PASS' with real values
     }
   });
 
   const mailOptions = {
-    from: 'your-email@gmail.com', // replace with your email
+    from: process.env.EMAIL_USER,
     to: recipientEmail,
     subject: 'Latest Articles CSV',
     text: 'Hello, please find attached the latest articles CSV file.',
@@ -46,18 +49,17 @@ const sendEmailWithAttachment = async (filePath, recipientEmail) => {
     const info = await transporter.sendMail(mailOptions);
     console.log(`Email sent: ${info.response}`);
   } catch (error) {
-    console.error(`Error sending email: ${error}`);
+    console.error(`Error sending email: ${error.message}`);
   }
 };
 
 // Scrape article information, save as CSV, and email
 const getArticleInformation = async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto("https://news.ycombinator.com/newest");
 
   let articles = [];
-  let pageCounter = 1;
 
   const parseRelativeTime = (timeText) => {
     const now = new Date();
@@ -76,9 +78,9 @@ const getArticleInformation = async () => {
   while (articles.length < 100) {
     const newArticles = await page.$$eval(".athing", (items) =>
       items.map((item) => {
-        const title = item.querySelector(".titleline > a")?.innerText;
+        const title = item.querySelector(".titleline > a")?.innerText || 'No title';
         const timeElement = item.nextElementSibling.querySelector(".age");
-        const timeText = timeElement ? timeElement.innerText : null;
+        const timeText = timeElement ? timeElement.innerText : 'Unknown time';
         return { title, timeText };
       })
     );
@@ -92,7 +94,6 @@ const getArticleInformation = async () => {
 
     await moreButton.click();
     await page.waitForLoadState("networkidle");
-    pageCounter++;
   }
 
   articles = articles.slice(0, 100);
@@ -109,8 +110,7 @@ const getArticleInformation = async () => {
 
   console.log(`CSV file saved to: ${filePath}`);
 
-  // Uncomment the following line if you want to send the CSV via email
-  await sendEmailWithAttachment(filePath, 'recipient@example.com'); // Replace with recipient email
+  await sendEmailWithAttachment(filePath, 'recipient@example.com'); // Replace with real email
 
   await browser.close();
 };
