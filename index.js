@@ -110,7 +110,7 @@ const getArticleInformation = async () => {
 
   console.log(`CSV file saved to: ${filePath}`);
 
-  await sendEmailWithAttachment(filePath, 'recipient@example.com'); // Replace with real email
+  await sendEmailWithAttachment(filePath, 'robmsc30@yahoo.com'); // Replace with real email
 
   await browser.close();
 };
