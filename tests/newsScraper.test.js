@@ -24,4 +24,3 @@ describe('scrapeArticles', () => {
     expect(articles[0]).toHaveProperty('title', 'Mock Title');
   });
 });
-
