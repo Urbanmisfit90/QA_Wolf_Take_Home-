@@ -1,14 +1,64 @@
-const { chromium } = require('playwright');
+const { chromium } = require("playwright");
+const fs = require('fs');
+const path = require('path');
+const nodemailer = require('nodemailer');
 
-(async () => {
-  const browser = await chromium.launch({headless: false});
+// Convert articles array to CSV format
+const toCSV = (articles) => {
+  const rows = articles.map((article, index) => {
+    return `${index + 1},"${article.title}","${article.timeText}","${article.time.toISOString()}"`;
+  });
+  return rows.join("\n");
+};
+
+// Save CSV content to a file
+const saveFile = (csvContent) => {
+  const filePath = path.join(__dirname, "articles.csv");
+  const header = "#,title,timeText,time\n";
+  fs.writeFileSync(filePath, header + csvContent, "utf8");
+  return filePath;
+};
+
+// Send an email with the CSV file as an attachment
+const sendEmailWithAttachment = async (filePath, recipientEmail) => {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail', // e.g., 'gmail'
+    auth: {
+      user: 'your-email@gmail.com', // replace with your email
+      pass: 'your-password-or-app-password' // replace with your password or app password
+    }
+  });
+
+  const mailOptions = {
+    from: 'your-email@gmail.com', // replace with your email
+    to: recipientEmail,
+    subject: 'Latest Articles CSV',
+    text: 'Hello, please find attached the latest articles CSV file.',
+    attachments: [
+      {
+        filename: 'articles.csv',
+        path: filePath
+      }
+    ]
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Email sent: ${info.response}`);
+  } catch (error) {
+    console.error(`Error sending email: ${error}`);
+  }
+};
+
+// Scrape article information, save as CSV, and email
+const getArticleInformation = async () => {
+  const browser = await chromium.launch({ headless: false });
   const page = await browser.newPage();
-  await page.goto('https://news.ycombinator.com/newest');
+  await page.goto("https://news.ycombinator.com/newest");
 
   let articles = [];
   let pageCounter = 1;
 
-  // Helper function to convert relative time to a Date object
   const parseRelativeTime = (timeText) => {
     const now = new Date();
     const [amount, unit] = timeText.split(" ");
@@ -24,76 +74,45 @@ const { chromium } = require('playwright');
   };
 
   while (articles.length < 100) {
-    const newArticles = await page.$$eval('.athing', items => items.map(item => {
-      const title = item.querySelector('.titleline > a')?.innerText;
-      const timeElement = item.nextElementSibling.querySelector('.age');
-      const timeText = timeElement ? timeElement.innerText : null;
-      return { title, timeText };
-    }));
+    const newArticles = await page.$$eval(".athing", (items) =>
+      items.map((item) => {
+        const title = item.querySelector(".titleline > a")?.innerText;
+        const timeElement = item.nextElementSibling.querySelector(".age");
+        const timeText = timeElement ? timeElement.innerText : null;
+        return { title, timeText };
+      })
+    );
 
     articles = articles.concat(newArticles);
 
     if (articles.length >= 100) break;
 
-    const moreButton = await page.$('a.morelink');
+    const moreButton = await page.$("a.morelink");
     if (!moreButton) break;
 
     await moreButton.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState("networkidle");
     pageCounter++;
   }
 
   articles = articles.slice(0, 100);
   console.log(`Successfully collected ${articles.length} articles.`);
 
-  // Convert relative times to Date objects for comparison
-  articles = articles.map(article => ({
+  articles = articles.map((article) => ({
     ...article,
-    time: parseRelativeTime(article.timeText)
+    time: parseRelativeTime(article.timeText),
   }));
-  console.log(articles)
+  articles.sort((a, b) => b.time - a.time);
 
-  let isOrderedCorrectly = true;
+  const csvContent = toCSV(articles);
+  const filePath = saveFile(csvContent);
 
-  for (let i = 0; i < articles.length - 1; i++) {
-    const currentArticleTime = articles[i].time;
-    const nextArticleTime = articles[i + 1].time;
+  console.log(`CSV file saved to: ${filePath}`);
 
-    if (currentArticleTime < nextArticleTime) {
-      console.log(`Ordering errors at articles ${i + 1} and ${i + 2}`);
-      console.log(`"${articles[i].title}" at ${articles[i].timeText}`);
-      console.log(`"${articles[i +1].title}" at ${articles[i + 1].timeText}`);
-      isOrderedCorrectly = false;
-      break;
-    }
-  }
-
-  if (isOrderedCorrectly) {
-    console.log('All 100 articles are correctly ordered from newest to oldest')
-  } else {
-    console.log('The articles are not ordered from newest to oldest.')
-  }
+  // Uncomment the following line if you want to send the CSV via email
+  await sendEmailWithAttachment(filePath, 'recipient@example.com'); // Replace with recipient email
 
   await browser.close();
-})();
+};
 
-
-
-
-
-// EDIT THIS FILE TO COMPLETE ASSIGNMENT QUESTION 1
-// const { chromium } = require("playwright");
-
-// async function sortHackerNewsArticles() {
-//   // launch browser
-//   const browser = await chromium.launch({ headless: false });
-//   const context = await browser.newContext();
-//   const page = await context.newPage();
-
-//   // go to Hacker News
-//   await page.goto("https://news.ycombinator.com/newest");
-// }
-
-// (async () => {
-//   await sortHackerNewsArticles();
-// })();
+getArticleInformation();
