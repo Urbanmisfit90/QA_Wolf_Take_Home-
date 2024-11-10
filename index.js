@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { chromium } = require("playwright");
 const fs = require('fs');
 const path = require('path');
@@ -5,6 +6,7 @@ const nodemailer = require('nodemailer');
 
 // Convert articles array to CSV format
 const toCSV = (articles) => {
+  if (!articles || articles.length === 0) return "No articles found.";
   let headers = Object.keys(articles[0]).join(",");
   headers = '#,' + headers;
   const rows = articles.map((article, index) => {
@@ -27,15 +29,15 @@ const saveFile = (csvContent) => {
 // Send an email with the CSV file as an attachment
 const sendEmailWithAttachment = async (filePath, recipientEmail) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // e.g., 'gmail'
+    service: 'gmail',
     auth: {
-      user: 'randomjacob51@gmail.com',
-      pass: '7448 5194'
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
   });
 
   const mailOptions = {
-    from: 'randomjacob51@gmail.com',
+    from: process.env.EMAIL_USER,
     to: recipientEmail,
     subject: 'Latest Articles CSV',
     text: 'Hello, please find attached the latest articles CSV file.',
@@ -57,64 +59,80 @@ const sendEmailWithAttachment = async (filePath, recipientEmail) => {
 
 // Scrape article information, save as CSV, and email
 const getArticleInformation = async () => {
-  const browser = await chromium.launch({ headless: false });
-  const page = await browser.newPage();
-  await page.goto("https://news.ycombinator.com/newest");
+  console.log("Starting article scraping...");
 
-  let articles = [];
-  let pageCounter = 1;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: false });
+    console.log("Browser launched");
 
-  const parseRelativeTime = (timeText) => {
-    const now = new Date();
-    const [amount, unit] = timeText.split(" ");
-    const value = parseInt(amount, 10);
+    const page = await browser.newPage();
+    console.log("Browser is open");
 
-    if (unit.startsWith("minute")) now.setMinutes(now.getMinutes() - value);
-    else if (unit.startsWith("hour")) now.setHours(now.getHours() - value);
-    else if (unit.startsWith("day")) now.setDate(now.getDate() - value);
-    else if (unit.startsWith("month")) now.setMonth(now.getMonth() - value);
-    else if (unit.startsWith("year")) now.setFullYear(now.getFullYear() - value);
+    await page.goto("https://news.ycombinator.com/newest");
 
-    return now;
-  };
+    let articles = [];
+    let pageCounter = 1;
 
-  while (articles.length < 100) {
-    const newArticles = await page.$$eval(".athing", (items) =>
-      items.map((item) => {
-        const title = item.querySelector(".titleline > a")?.innerText;
-        const timeElement = item.nextElementSibling.querySelector(".age");
-        const timeText = timeElement ? timeElement.innerText : null;
-        return { title, timeText };
-      })
-    );
+    const parseRelativeTime = (timeText) => {
+      const now = new Date();
+      const [amount, unit] = timeText.split(" ");
+      const value = parseInt(amount, 10);
 
-    articles = articles.concat(newArticles);
+      if (unit.startsWith("minute")) now.setMinutes(now.getMinutes() - value);
+      else if (unit.startsWith("hour")) now.setHours(now.getHours() - value);
+      else if (unit.startsWith("day")) now.setDate(now.getDate() - value);
+      else if (unit.startsWith("month")) now.setMonth(now.getMonth() - value);
+      else if (unit.startsWith("year")) now.setFullYear(now.getFullYear() - value);
 
-    if (articles.length >= 100) break;
+      return now;
+    };
 
-    const moreButton = await page.$("a.morelink");
-    if (!moreButton) break;
+    while (articles.length < 100) {
+      console.log(`Scraping page ${pageCounter}`);
+      const newArticles = await page.$$eval(".athing", (items) =>
+        items.map((item) => {
+          const title = item.querySelector(".titleline > a")?.innerText;
+          const timeElement = item.nextElementSibling.querySelector(".age");
+          const timeText = timeElement ? timeElement.innerText : null;
+          return { title, timeText };
+        })
+      );
 
-    await moreButton.click();
-    await page.waitForLoadState("networkidle");
-    pageCounter++;
+      articles = articles.concat(newArticles);
+
+      if (articles.length >= 100) break;
+
+      const moreButton = await page.$("a.morelink");
+      if (!moreButton) break;
+
+      await moreButton.click();
+      await page.waitForLoadState("networkidle");
+      pageCounter++;
+    }
+
+    articles = articles.slice(0, 100);
+    console.log(`Successfully collected ${articles.length} articles.`);
+
+    articles = articles.map((article) => ({
+      ...article,
+      time: parseRelativeTime(article.timeText),
+    }));
+    articles.sort((a, b) => b.time - a.time);
+
+    const csvContent = toCSV(articles);
+    const filePath = saveFile(csvContent);
+
+    await sendEmailWithAttachment(filePath, 'robmsc30@yahoo.com');
+
+  } catch (error) {
+    console.error("Error launching browser:", error);
+  } finally {
+    if (browser) {
+      await browser.close();
+      console.log("Browser closed");
+    }
   }
-
-  articles = articles.slice(0, 100);
-  console.log(`Successfully collected ${articles.length} articles.`);
-
-  articles = articles.map((article) => ({
-    ...article,
-    time: parseRelativeTime(article.timeText),
-  }));
-  articles.sort((a, b) => b.time - a.time);
-
-  const csvContent = toCSV(articles);
-  const filePath = saveFile(csvContent);
-
-  await sendEmailWithAttachment(filePath, 'jacobmaxplumb@gmail.com'); // Replace with recipient email
-
-  await browser.close();
 };
 
 getArticleInformation();
