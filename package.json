@@ -1,14 +1,15 @@
 {
   "name": "qa_wolf_take_home",
   "version": "1.0.0",
-  "description": "",
+  "description": "A web scraper for Hacker News articles",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "test": "jest"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["web scraping", "hacker news", "playwright"],
+  "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -19,7 +20,10 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@types/node": "^20.8.9",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "@babel/core": "^7.22.5",
+    "@babel/preset-env": "^7.22.5",
+    "babel-jest": "^29.5.0"
   }
 }
 
