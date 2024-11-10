@@ -53,4 +53,3 @@ async function scrapeArticles() {
 }
 
 module.exports = { scrapeArticles };
-
