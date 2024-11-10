@@ -132,4 +132,4 @@ const getArticleInformation = async () => {
   }
 };
 
-getArticleInformation(); // Run the function to start the scraping process
+getArticleInformation(); // Run the function to start the scraping process 
