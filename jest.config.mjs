@@ -1,7 +1,13 @@
+import { defaults } from 'jest-config';
+
 export default {
-    testEnvironment: 'node',
-    transform: {},
-    moduleFileExtensions: ['js', 'mjs'],
-    testMatch: ['**/__tests__/**/*.mjs', '**/?(*.)+(spec|test).mjs'],
-    verbose: true,
-  };
+  transform: {
+    '^.+\\.mjs$': 'babel-jest',  // Use Babel for .mjs files
+  },
+  extensionsToTreatAsEsm: ['.mjs'], // Treat .mjs files as ESM
+  transformIgnorePatterns: [
+    'node_modules/(?!@babel|core-js|regenerator-runtime)', // Add dependencies to be transformed
+  ],
+  testMatch: ['**/tests/jest/**/*.test.[jt]s?(x)'], // Run Jest tests only in specific directories
+  preset: 'jest-preset-angular',
+};
