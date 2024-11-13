@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "A web scraper for Hacker News articles",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "start": "node index.js",
     "test": "jest"

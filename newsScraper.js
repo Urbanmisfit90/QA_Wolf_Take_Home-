@@ -12,25 +12,27 @@ async function scrapeArticles() {
 
     const parseRelativeTime = (timeText) => {
       const now = new Date();
-      const [amount, unit] = timeText.split(" ");
+      const [amount, unit] = timeText.split(' ');
       const value = parseInt(amount, 10);
 
-      if (unit.startsWith("minute")) now.setMinutes(now.getMinutes() - value);
-      else if (unit.startsWith("hour")) now.setHours(now.getHours() - value);
-      else if (unit.startsWith("day")) now.setDate(now.getDate() - value);
-      else if (unit.startsWith("month")) now.setMonth(now.getMonth() - value);
-      else if (unit.startsWith("year")) now.setFullYear(now.getFullYear() - value);
+      if (unit.startsWith('minute')) now.setMinutes(now.getMinutes() - value);
+      else if (unit.startsWith('hour')) now.setHours(now.getHours() - value);
+      else if (unit.startsWith('day')) now.setDate(now.getDate() - value);
+      else if (unit.startsWith('month')) now.setMonth(now.getMonth() - value);
+      else if (unit.startsWith('year')) now.setFullYear(now.getFullYear() - value);
 
       return now;
     };
 
     while (articles.length < 100) {
-      const newArticles = await page.$$eval('.athing', items => items.map(item => {
-        const title = item.querySelector('.titleline > a')?.innerText;
-        const timeElement = item.nextElementSibling.querySelector('.age');
-        const timeText = timeElement ? timeElement.innerText : null;
-        return { title, timeText };
-      }));
+      const newArticles = await page.$$eval('.athing', (items) =>
+        items.map((item) => {
+          const title = item.querySelector('.titleline > a')?.innerText;
+          const timeElement = item.nextElementSibling.querySelector('.age');
+          const timeText = timeElement ? timeElement.innerText : null;
+          return { title, timeText };
+        })
+      );
 
       articles = articles.concat(newArticles);
 

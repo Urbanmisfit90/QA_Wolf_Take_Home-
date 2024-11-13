@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config()
 const { chromium } = require("playwright");
 const fs = require('fs');
 const path = require('path');
@@ -6,7 +6,6 @@ const nodemailer = require('nodemailer');
 
 // Convert articles array to CSV format
 const toCSV = (articles) => {
-  if (!articles || articles.length === 0) return "No articles found.";
   let headers = Object.keys(articles[0]).join(",");
   headers = '#,' + headers;
   const rows = articles.map((article, index) => {
@@ -29,7 +28,7 @@ const saveFile = (csvContent) => {
 // Send an email with the CSV file as an attachment
 const sendEmailWithAttachment = async (filePath, recipientEmail) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'gmail', // e.g., 'gmail'
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
@@ -59,80 +58,64 @@ const sendEmailWithAttachment = async (filePath, recipientEmail) => {
 
 // Scrape article information, save as CSV, and email
 const getArticleInformation = async () => {
-  console.log("Starting article scraping...");
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  await page.goto("https://news.ycombinator.com/newest");
 
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: false });
-    console.log("Browser launched");
+  let articles = [];
+  let pageCounter = 1;
 
-    const page = await browser.newPage();
-    console.log("Browser is open");
+  const parseRelativeTime = (timeText) => {
+    const now = new Date();
+    const [amount, unit] = timeText.split(" ");
+    const value = parseInt(amount, 10);
 
-    await page.goto("https://news.ycombinator.com/newest");
+    if (unit.startsWith("minute")) now.setMinutes(now.getMinutes() - value);
+    else if (unit.startsWith("hour")) now.setHours(now.getHours() - value);
+    else if (unit.startsWith("day")) now.setDate(now.getDate() - value);
+    else if (unit.startsWith("month")) now.setMonth(now.getMonth() - value);
+    else if (unit.startsWith("year")) now.setFullYear(now.getFullYear() - value);
 
-    let articles = [];
-    let pageCounter = 1;
+    return now;
+  };
 
-    const parseRelativeTime = (timeText) => {
-      const now = new Date();
-      const [amount, unit] = timeText.split(" ");
-      const value = parseInt(amount, 10);
+  while (articles.length < 100) {
+    const newArticles = await page.$$eval(".athing", (items) =>
+      items.map((item) => {
+        const title = item.querySelector(".titleline > a")?.innerText;
+        const timeElement = item.nextElementSibling.querySelector(".age");
+        const timeText = timeElement ? timeElement.innerText : null;
+        return { title, timeText };
+      })
+    );
 
-      if (unit.startsWith("minute")) now.setMinutes(now.getMinutes() - value);
-      else if (unit.startsWith("hour")) now.setHours(now.getHours() - value);
-      else if (unit.startsWith("day")) now.setDate(now.getDate() - value);
-      else if (unit.startsWith("month")) now.setMonth(now.getMonth() - value);
-      else if (unit.startsWith("year")) now.setFullYear(now.getFullYear() - value);
+    articles = articles.concat(newArticles);
 
-      return now;
-    };
+    if (articles.length >= 100) break;
 
-    while (articles.length < 100) {
-      console.log(`Scraping page ${pageCounter}`);
-      const newArticles = await page.$$eval(".athing", (items) =>
-        items.map((item) => {
-          const title = item.querySelector(".titleline > a")?.innerText;
-          const timeElement = item.nextElementSibling.querySelector(".age");
-          const timeText = timeElement ? timeElement.innerText : null;
-          return { title, timeText };
-        })
-      );
+    const moreButton = await page.$("a.morelink");
+    if (!moreButton) break;
 
-      articles = articles.concat(newArticles);
-
-      if (articles.length >= 100) break;
-
-      const moreButton = await page.$("a.morelink");
-      if (!moreButton) break;
-
-      await moreButton.click();
-      await page.waitForLoadState("networkidle");
-      pageCounter++;
-    }
-
-    articles = articles.slice(0, 100);
-    console.log(`Successfully collected ${articles.length} articles.`);
-
-    articles = articles.map((article) => ({
-      ...article,
-      time: parseRelativeTime(article.timeText),
-    }));
-    articles.sort((a, b) => b.time - a.time);
-
-    const csvContent = toCSV(articles);
-    const filePath = saveFile(csvContent);
-
-    await sendEmailWithAttachment(filePath, 'robmsc30@yahoo.com');
-
-  } catch (error) {
-    console.error("Error launching browser:", error);
-  } finally {
-    if (browser) {
-      await browser.close();
-      console.log("Browser closed");
-    }
+    await moreButton.click();
+    await page.waitForLoadState("networkidle");
+    pageCounter++;
   }
+
+  articles = articles.slice(0, 100);
+  console.log(`Successfully collected ${articles.length} articles.`);
+
+  articles = articles.map((article) => ({
+    ...article,
+    time: parseRelativeTime(article.timeText),
+  }));
+  articles.sort((a, b) => b.time - a.time);
+
+  const csvContent = toCSV(articles);
+  const filePath = saveFile(csvContent);
+
+  await sendEmailWithAttachment(filePath, 'robmsc30@yahoo.com'); // Replace with recipient email
+
+  await browser.close();
 };
 
 getArticleInformation();
