@@ -32,3 +32,5 @@ EMAIL_PASS=your-app-password-here
 ## 4. Run the Script
 
 node index.js 100 recipient@example.com
+
+This script automates the process of scraping the latest articles from Hacker News, converting the data into a CSV file, and emailing the file as an attachment. It uses Playwright for web scraping, processes the timestamps of the articles, and ensures they are sorted from newest to oldest before sending the email.
