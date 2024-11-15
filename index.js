@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config();
 const { chromium } = require("playwright");
 const fs = require('fs');
 const path = require('path');
@@ -52,8 +52,8 @@ const sendEmailWithAttachment = async (filePath, recipientEmail) => {
 };
 
 // Scrape article information, save as CSV, and email
-const getArticleInformation = async () => {
-  const browser = await chromium.launch({ headless: false });
+const getArticleInformation = async (articleCount, recipientEmail) => {
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto("https://news.ycombinator.com/newest");
 
@@ -74,7 +74,7 @@ const getArticleInformation = async () => {
     return now;
   };
 
-  while (articles.length < 100) {
+  while (articles.length < articleCount) {
     const newArticles = await page.$$eval(".athing", (items) => {
       return items.map((item) => {
         const title = item.querySelector(".titleline > a")?.innerText;
@@ -92,7 +92,7 @@ const getArticleInformation = async () => {
 
     articles = articles.concat(newArticles);
 
-    if (articles.length < 100) {
+    if (articles.length < articleCount) {
       const moreLink = await page.$("a.morelink");
       if (moreLink) {
         await moreLink.click();
@@ -104,7 +104,7 @@ const getArticleInformation = async () => {
     }
   }
 
-  articles = articles.slice(0, 100);
+  articles = articles.slice(0, articleCount);
   articles.sort((a, b) => b.time - a.time);
 
   const isSorted = articles.every((article, index, array) => 
@@ -122,9 +122,14 @@ const getArticleInformation = async () => {
   const csvContent = toCSV(articles);
   const filePath = saveFile(csvContent);
 
-  await sendEmailWithAttachment(filePath, 'recipient@example.com');
+  await sendEmailWithAttachment(filePath, recipientEmail);
 
   await browser.close();
 };
 
-getArticleInformation();
+// Parse command-line arguments
+const args = process.argv.slice(2);
+const articleCount = parseInt(args[0], 10) || 100; // Default to 100 if not provided
+const recipientEmail = args[1] || 'recipient@example.com'; // Default recipient email
+
+getArticleInformation(articleCount, recipientEmail);
