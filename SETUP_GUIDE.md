@@ -10,7 +10,7 @@
 
 ## 2. Generate an App Password
 
-1. If you don’t see **App Passwords** directly in the Security section:
+1. If you don't see **App Passwords** directly in the Security section:
    - Search for **"App Passwords"** in your Google Account settings.
    - Select **App Passwords** under the Security settings.
    
